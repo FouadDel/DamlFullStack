@@ -1,0 +1,105 @@
+module BetSlip where
+
+import Daml.Script
+import Iou
+import Bet
+
+type BetSlipId = ContractId BetSlip
+
+template BetSlip
+  with
+    house   : Party
+    bettor  : Party
+    horse   : Text
+  where
+    ensure horse /= ""
+    signatory house
+    observer bettor
+
+    choice PlaceBet : BetSlipId 
+      with
+        newBettor : Party
+        iou: ContractId Iou                               
+      controller bettor
+      do create this with
+           bettor = newBettor
+         
+    choice CancelBet : ()
+      with 
+        betSlipIdentifier: BetSlipId
+      controller bettor
+      do 
+       archive betSlipIdentifier
+       return ()
+
+    nonconsuming choice SettleBet : ()
+      with 
+        betId:      ContractId Bet
+        betSlipId:  ContractId BetSlip
+      controller house
+      do 
+      --if (betId.winner==betSlipIdHorse) create Iou with amount from Bettor IOU x Odd 
+      -- else  recording a no win with return ()
+      return()
+
+
+setup : Script()
+setup = script do
+-- user_setup_begin
+  alice <- allocatePartyWithHint "Alice" (PartyIdHint "Alice")
+  bob   <- allocatePartyWithHint "Bob" (PartyIdHint "Bob")
+  gambleking <- allocatePartyWithHint "GambleKing" (PartyIdHint "GambleKing")
+  bank <- allocatePartyWithHint "Bank" (PartyIdHint "Bank")
+  aliceId <- validateUserId "alice"
+  bobId <- validateUserId "bob"
+  gamblekingId <- validateUserId "gambleking"
+  createUser (User aliceId (Some alice)) [CanActAs alice]
+  createUser (User bobId (Some alice)) [CanActAs bob]
+  createUser (User gamblekingId (Some gambleking)) [CanActAs gambleking]
+-- user_setup_end
+--Create a slip
+  firstSlip <- submit gambleking do
+    createCmd BetSlip with
+      house  = gambleking
+      bettor = alice
+      horse  = "Thunder"
+--Create an IOU to pay for betting
+  aliceIou <- submit bank do 
+    createCmd Iou with
+      issuer=bank
+      owner=alice
+      amount=200.0
+--Place a Bet with potential future house rules
+  houseRules <- submit alice do
+    exerciseCmd firstSlip PlaceBet with 
+      iou = aliceIou
+      newBettor = gambleking
+--Place a Bet with Alice as bettor 
+  submit gambleking do
+    exerciseCmd houseRules PlaceBet with 
+     iou = aliceIou
+     newBettor = alice
+--Unhappy path - Bob cannot bet on behalf of Alice because the contract houseRules has been consumed
+  submitMustFail bob do
+    exerciseCmd houseRules PlaceBet with 
+     iou = aliceIou
+     newBettor = alice
+--Create a Bet with 10 horses
+  firstBet <- submit gambleking do
+    createCmd Bet with
+      house  = gambleking
+      bettors = [alice, bob]
+      winner = ""
+      horses  = ["Thunder","Lightning","Quick Sand","Gallop King"]
+--Pick the winnner       
+  submit gambleking do
+    exerciseCmd firstBet PickWinner with newWinner = "Quick Sand"
+--Settle the Bet if Alice has picked a winning horse
+  
+--Settle the Bet if Alice has picked a losing horse
+
+--Cancel the Bet if Alice cancels the bet
+
+
+
+  return()

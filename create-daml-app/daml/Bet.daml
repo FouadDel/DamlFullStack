@@ -1,0 +1,49 @@
+module Bet where
+
+import Daml.Script
+
+type BetId = ContractId Bet
+
+template Bet
+  with
+    house    : Party
+    bettors   : [Party]
+    winner   : Text
+    horses   : [Text]
+  where
+    signatory house
+    observer bettors
+    choice PickWinner : BetId
+      with
+        newWinner : Text
+      controller house
+      do create this with
+           winner = newWinner
+
+setup : Script BetId
+setup = script do
+-- user_setup_begin
+  alice <- allocatePartyWithHint "Alice" (PartyIdHint "Alice")
+  bob   <- allocatePartyWithHint "Bob" (PartyIdHint "Bob")
+  gambleking <- allocatePartyWithHint "GambleKing" (PartyIdHint "GambleKing")
+  aliceId <- validateUserId "alice"
+  bobId <- validateUserId "bob"
+  gamblekingId <- validateUserId "gambleking"
+  createUser (User aliceId (Some alice)) [CanActAs alice]
+  createUser (User bobId (Some alice)) [CanActAs bob]
+  createUser (User gamblekingId (Some gambleking)) [CanActAs gambleking]
+-- user_setup_end
+
+  firstBet <- submit gambleking do
+    createCmd Bet with
+      house  = gambleking
+      bettors = [alice, bob]
+      winner = ""
+      horses  = ["Thunder","Lightning","Quick Sand","Gallop King"]
+
+  submit gambleking do
+    exerciseCmd firstBet PickWinner with newWinner = "Quick Sand"
+
+ 
+
+ 
