@@ -1,0 +1,7 @@
+Prereq: https://docs.daml.com/getting-started/first-feature.html
+
+Run scrips in DAML folder for back end. 
+
+For UI component, Run Canton server and HTPP JSON servor to lauch browser. (See prereq to learn how?)
+
+Press r after changing DAML code on the Canton Server. 
